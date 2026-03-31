@@ -409,6 +409,31 @@
 
         /* Utils */
         .hidden { display: none !important; }
+
+        /* New Edit/Move Buttons */
+        .nav-item { position: relative; padding-right: 60px; }
+        .move-controls {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            gap: 4px;
+        }
+        .nav-item:hover .move-controls { display: flex; }
+        .move-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.05);
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .move-btn:hover { background: #e2e8f0; border-color: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -435,7 +460,10 @@
                 Interview Hub
             </div>
             <div class="project-title">
-                <span id="currentProjectName">PROJECT NAME</span>
+                <div>
+                    <span id="currentProjectName">PROJECT NAME</span>
+                    <button class="switch-btn" onclick="editCurrentProject()" style="padding:2px 4px; margin-left:4px;">✏️</button>
+                </div>
                 <button class="switch-btn" onclick="showDashboard()">切替</button>
             </div>
             <div class="search-container">
@@ -546,7 +574,10 @@
                     <p>${project.description || '概要なし'}</p>
                     <div class="meta">
                         <span>${project.data.length} 件の質問</span>
-                        <button class="switch-btn" onclick="event.stopPropagation(); deleteProject(${index})" style="color:#ef4444;">削除</button>
+                        <div>
+                            <button class="switch-btn" onclick="event.stopPropagation(); editProject(${index})">編集</button>
+                            <button class="switch-btn" onclick="event.stopPropagation(); deleteProject(${index})" style="color:#ef4444; margin-left:4px;">削除</button>
+                        </div>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -603,6 +634,27 @@
             renderDashboard();
         }
 
+        function editProject(index) {
+            const project = allProjects[index];
+            const newName = prompt('企業名：', project.name);
+            if (newName === null) return;
+            const newDesc = prompt('概要：', project.description || '');
+            if (newDesc === null) return;
+            
+            project.name = newName || project.name;
+            project.description = newDesc;
+            saveData();
+            renderDashboard();
+            if (currentProjectIndex === index) {
+                document.getElementById('currentProjectName').innerText = project.name;
+            }
+        }
+
+        function editCurrentProject() {
+            if (currentProjectIndex === null) return;
+            editProject(currentProjectIndex);
+        }
+
         function deleteProject(index) {
             if (!confirm('このプロジェクトを削除してもよろしいですか？データは元に戻せません。')) return;
             allProjects.splice(index, 1);
@@ -640,7 +692,13 @@
             const div = document.createElement('div');
             div.className = `nav-item ${selectedId === item.id ? 'active' : ''} ${isChild ? 'child' : ''} ${item.isMemo ? 'memo' : ''}`;
             div.onclick = () => selectItem(item.id);
-            div.innerHTML = `<div>${item.isMemo ? '📝 ' : ''}${item.title}</div>`;
+            div.innerHTML = `
+                <div>${item.isMemo ? '📝 ' : ''}${item.title}</div>
+                <div class="move-controls" onclick="event.stopPropagation()">
+                    <div class="move-btn" onclick="moveQuestion(${item.id}, -1)">▲</div>
+                    <div class="move-btn" onclick="moveQuestion(${item.id}, 1)">▼</div>
+                </div>
+            `;
             container.appendChild(div);
         }
 
@@ -794,6 +852,29 @@
             selectedId = null;
             document.getElementById('welcomeMsg').style.display = 'block';
             document.getElementById('qaCard').style.display = 'none';
+            listItems();
+        }
+
+        function moveQuestion(id, direction) {
+            const data = getCurrentData();
+            const index = data.findIndex(i => i.id === id);
+            if (index === -1) return;
+
+            const item = data[index];
+            // Find siblings (same parent)
+            const siblings = data.filter(i => i.parentId === item.parentId);
+            const siblingIndex = siblings.findIndex(i => i.id === id);
+            
+            const targetSiblingIndex = siblingIndex + direction;
+            if (targetSiblingIndex < 0 || targetSiblingIndex >= siblings.length) return;
+
+            const targetSibling = siblings[targetSiblingIndex];
+            const targetIndex = data.findIndex(i => i.id === targetSibling.id);
+
+            // Swap in the original data array
+            [data[index], data[targetIndex]] = [data[targetIndex], data[index]];
+
+            saveData();
             listItems();
         }
 
