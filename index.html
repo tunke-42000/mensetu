@@ -434,6 +434,23 @@
             border: 1px solid transparent;
         }
         .move-btn:hover { background: #e2e8f0; border-color: #cbd5e1; }
+
+        /* Toggle Icon */
+        .toggle-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            font-size: 1rem;
+            color: #64748b;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        .nav-item.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
     </style>
 </head>
 <body>
@@ -528,6 +545,7 @@
         let selectedId = null;
         let studyMode = false;
         let editingSection = null;
+        let collapsedParentIds = new Set();
 
         // Initialize Data
         function initApp() {
@@ -682,18 +700,33 @@
             const others = filtered.filter(item => item.parentId !== null);
 
             roots.forEach(root => {
-                renderNavItem(list, root, false);
                 const children = others.filter(child => child.parentId === root.id);
-                children.forEach(child => renderNavItem(list, child, true));
+                const hasChildren = children.length > 0;
+                const isCollapsed = collapsedParentIds.has(root.id);
+                
+                renderNavItem(list, root, false, hasChildren, isCollapsed);
+                
+                if (!isCollapsed) {
+                    children.forEach(child => renderNavItem(list, child, true));
+                }
             });
         }
 
-        function renderNavItem(container, item, isChild) {
+        function renderNavItem(container, item, isChild, hasChildren = false, isCollapsed = false) {
             const div = document.createElement('div');
-            div.className = `nav-item ${selectedId === item.id ? 'active' : ''} ${isChild ? 'child' : ''} ${item.isMemo ? 'memo' : ''}`;
+            div.className = `nav-item ${selectedId === item.id ? 'active' : ''} ${isChild ? 'child' : ''} ${item.isMemo ? 'memo' : ''} ${isCollapsed ? 'collapsed' : ''}`;
             div.onclick = () => selectItem(item.id);
+            
+            let iconHTML = '';
+            if (!isChild && hasChildren) {
+                iconHTML = `<span class="toggle-icon">▾</span>`;
+            }
+
             div.innerHTML = `
-                <div>${item.isMemo ? '📝 ' : ''}${item.title}</div>
+                <div style="display:flex; align-items:center;">
+                    ${iconHTML}
+                    <div>${item.isMemo ? '📝 ' : ''}${item.title}</div>
+                </div>
                 <div class="move-controls" onclick="event.stopPropagation()">
                     <div class="move-btn" onclick="moveQuestion(${item.id}, -1)">▲</div>
                     <div class="move-btn" onclick="moveQuestion(${item.id}, 1)">▼</div>
@@ -703,6 +736,17 @@
         }
 
         function selectItem(id) {
+            const data = getCurrentData();
+            const hasChildren = data.some(item => item.parentId === id);
+
+            if (selectedId === id && hasChildren) {
+                if (collapsedParentIds.has(id)) {
+                    collapsedParentIds.delete(id);
+                } else {
+                    collapsedParentIds.add(id);
+                }
+            }
+
             selectedId = id;
             editingSection = null;
             listItems();
